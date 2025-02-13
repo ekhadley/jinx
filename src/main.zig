@@ -22,6 +22,27 @@ const move_down_code = escape_code ++ "[B";
 const move_right_code = escape_code ++ "[C";
 const move_left_code = escape_code ++ "[D";
 
+const Terminal = struct {
+    tty: File,
+    rows: usize,
+    cols: usize,
+    pix_width: usize,
+    pix_height: usize,
+    pub fn init() !Terminal {
+        const tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .write_only, .allow_ctty = true });
+        var dims: std.posix.system.winsize = undefined;
+        const x = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
+        print("ioctl returned: {d}", .{x});
+        return .{ .tty = tty, .rows = dims.ws_row, .cols = dims.ws_col, .pix_width = dims.ws_xpixel, .pix_height = dims.ws_ypixel };
+    }
+    pub fn writeBuffer(self: Terminal, buffer: ScreenBuffer) File.WriteError!void {
+        try self.tty.writeAll(buffer.contents[0..buffer.place]);
+    }
+    pub fn close(self: Terminal) void {
+        self.tty.close();
+    }
+};
+
 const ScreenBuffer = struct {
     const Self = @This();
     place: usize,
@@ -42,9 +63,9 @@ const ScreenBuffer = struct {
         }
         self.place += str.len;
     }
-    pub fn moveTo(self: *Self, x: u32, y: u32) void {
-        var X: u32 = x;
-        var Y: u32 = y;
+    pub fn moveTo(self: *Self, x: usize, y: usize) void {
+        var X: usize = x;
+        var Y: usize = y;
         self.write(escape_code);
         self.push('[');
         for (0..3) |i| {
@@ -57,58 +78,46 @@ const ScreenBuffer = struct {
         self.contents[self.place + 7] = 'H';
         self.place += 8;
     }
+    pub fn hLine(self: *Self, x1: usize, y: usize, x2: usize) void {
+        self.moveTo(x1, y);
+        if (x2 > x1) {
+            for (x1..x2) |_| {
+                self.push('═');
+            }
+        } else {
+            for (x2..x1) |_| {
+                self.push('═');
+            }
+        }
+    }
+    pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize) void {
+        self.moveTo(x, y1);
+        if (y2 > y1) {
+            for (y1..y2) |_| {
+                self.push('║');
+            }
+        } else {
+            for (y2..y1) |_| {
+                self.push('║');
+            }
+        }
+    }
 };
-
-pub fn openTerminalFile() File.OpenError!File {
-    return std.fs.openFileAbsolute("/dev/tty", .{ .mode = .write_only, .allow_ctty = true });
-}
-
-pub fn writeBuffer(tty: File, buffer: ScreenBuffer) File.WriteError!void {
-    try tty.writeAll(buffer.contents[0..buffer.place]);
-}
 
 pub fn main() !void {
     //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     //defer _ = gpa.deinit();
     //const alloc = gpa.allocator();
 
-    const tty = try openTerminalFile();
+    const tty = try Terminal.init();
     defer tty.close();
     var buf = ScreenBuffer.init();
+    print("terminal size detected: [{d}, {d}]", .{ tty.rows, tty.cols });
 
     buf.write(clear_screen_code);
-    buf.moveTo(10, 20);
-    buf.write(red_code);
-    buf.write("slorpglorpin");
-    buf.moveTo(30, 5);
-    buf.write(green_code);
-    buf.write("aboba");
-    buf.write(end_color_code);
-    buf.moveTo(20, 3);
-    buf.write("agobobagoga");
-    buf.write(go_home_code);
+    buf.write(blue_code);
+    buf.hLine(0, 0, tty.cols);
 
-    //print("buffer contents: \n{s}\n", .{buf.contents[0..buf.place]});
-    const cx = 40;
-    const cy = 40;
-    const r: f32 = 10;
-
-    var theta: f32 = 0;
-    var rx: f32 = 0;
-    var ry: f32 = 0;
-    while (true) {
-        ry = r * std.math.sin(theta);
-        rx = r * std.math.cos(theta);
-        theta += 0.01;
-
-        buf.dump();
-
-        buf.write(green_code);
-        buf.moveTo(@intFromFloat(cx + rx), @intFromFloat(cy + ry));
-        buf.write("aboba");
-        buf.write(go_home_code);
-
-        try writeBuffer(tty, buf);
-        std.time.sleep(10_000_000);
-    }
+    try tty.writeBuffer(buf);
+    while (true) {}
 }
