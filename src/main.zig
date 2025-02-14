@@ -1,7 +1,7 @@
 const std = @import("std");
 const print = std.debug.print;
 const File = std.fs.File;
-const MAX_BUFFER_SIZE = 1024;
+const MAX_BUFFER_SIZE = 8192;
 
 const escape_code = "\x1b";
 const go_home_code = escape_code ++ "[H";
@@ -79,27 +79,22 @@ const ScreenBuffer = struct {
         self.place += 8;
     }
     pub fn hLine(self: *Self, x1: usize, y: usize, x2: usize) void {
-        self.moveTo(x1, y);
-        if (x2 > x1) {
-            for (x1..x2) |_| {
-                self.push('═');
-            }
-        } else {
-            for (x2..x1) |_| {
-                self.push('═');
-            }
+        const start = @min(x1, x2);
+        const end = @max(x1, x2);
+
+        self.moveTo(start, y);
+        for (start..end) |_| {
+            self.write("═");
         }
     }
     pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize) void {
-        self.moveTo(x, y1);
-        if (y2 > y1) {
-            for (y1..y2) |_| {
-                self.push('║');
-            }
-        } else {
-            for (y2..y1) |_| {
-                self.push('║');
-            }
+        const start = @min(y1, y2);
+        const end = @max(y1, y2);
+
+        self.moveTo(x, start);
+        for (start..end) |y| {
+            self.moveTo(x, y);
+            self.write("║");
         }
     }
 };
@@ -116,7 +111,13 @@ pub fn main() !void {
 
     buf.write(clear_screen_code);
     buf.write(blue_code);
-    buf.hLine(0, 0, tty.cols);
+    buf.hLine(2, 1, tty.cols - 2);
+    buf.hLine(2, tty.cols - 2, tty.cols - 2);
+    buf.vLine(1, 2, tty.rows);
+    buf.vLine(tty.cols - 2, 2, tty.rows);
+
+    buf.moveTo(tty.rows / 2, tty.cols / 2);
+    buf.write("imgay");
 
     try tty.writeBuffer(buf);
     while (true) {}
