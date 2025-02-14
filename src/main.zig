@@ -107,16 +107,16 @@ pub fn main() !void {
     buf.vLine(0, 2, tty.rows, symbols.ver_double_line);
     buf.vLine(tty.cols, 2, tty.rows, symbols.ver_double_line);
 
-    //buf.moveTo(1, 1);
-    //buf.write(symbols.tl_double_line);
-    //buf.moveTo(tty.cols, 1);
-    //buf.write(symbols.tr_double_line);
-    //buf.moveTo(1, tty.rows + 1);
-    //buf.write(symbols.bl_double_line);
-    //buf.moveTo(tty.cols, tty.rows + 1);
-    //buf.write(symbols.br_double_line);
-    //buf.moveTo(tty.cols / 2, tty.rows / 2);
-    //buf.write("imgay");
+    buf.moveTo(1, 1);
+    buf.write(symbols.tl_double_line);
+    buf.moveTo(tty.cols, 1);
+    buf.write(symbols.tr_double_line);
+    buf.moveTo(1, tty.rows + 1);
+    buf.write(symbols.bl_double_line);
+    buf.moveTo(tty.cols, tty.rows + 1);
+    buf.write(symbols.br_double_line);
+    buf.moveTo(tty.cols / 2, tty.rows / 2);
+    buf.write("imgay");
 
     try tty.writeBuffer(buf);
     while (true) {}
