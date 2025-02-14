@@ -1,26 +1,9 @@
 const std = @import("std");
 const print = std.debug.print;
 const File = std.fs.File;
+const symbols = @import("symbols.zig");
+
 const MAX_BUFFER_SIZE = 8192;
-
-const escape_code = "\x1b";
-const go_home_code = escape_code ++ "[H";
-const clear_screen_code = escape_code ++ "[2J";
-
-const black_code = escape_code ++ "[0;30m";
-const red_code = escape_code ++ "[0;31m";
-const green_code = escape_code ++ "[0;32m";
-const yellow_code = escape_code ++ "[0;33m";
-const blue_code = escape_code ++ "[0;34m";
-const purple_code = escape_code ++ "[0;35m";
-const cyan_code = escape_code ++ "[0;36m";
-const white_code = escape_code ++ "[0;37m";
-const end_color_code = escape_code ++ "[0m";
-
-const move_up_code = escape_code ++ "[A";
-const move_down_code = escape_code ++ "[B";
-const move_right_code = escape_code ++ "[C";
-const move_left_code = escape_code ++ "[D";
 
 const Terminal = struct {
     tty: File,
@@ -31,9 +14,16 @@ const Terminal = struct {
     pub fn init() !Terminal {
         const tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .write_only, .allow_ctty = true });
         var dims: std.posix.system.winsize = undefined;
-        const x = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
-        print("ioctl returned: {d}", .{x});
-        return .{ .tty = tty, .rows = dims.ws_row, .cols = dims.ws_col, .pix_width = dims.ws_xpixel, .pix_height = dims.ws_ypixel };
+        _ = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
+        return .{
+            .tty = tty,
+            .pix_width = dims.ws_xpixel,
+            .pix_height = dims.ws_ypixel,
+            //.rows = dims.ws_row,
+            //.cols = dims.ws_col,
+            .rows = dims.ws_row,
+            .cols = dims.ws_col,
+        };
     }
     pub fn writeBuffer(self: Terminal, buffer: ScreenBuffer) File.WriteError!void {
         try self.tty.writeAll(buffer.contents[0..buffer.place]);
@@ -66,7 +56,7 @@ const ScreenBuffer = struct {
     pub fn moveTo(self: *Self, x: usize, y: usize) void {
         var X: usize = x;
         var Y: usize = y;
-        self.write(escape_code);
+        self.write(symbols.escape);
         self.push('[');
         for (0..3) |i| {
             self.contents[self.place + 2 - i] = @intCast(Y % 10 + '0');
@@ -78,23 +68,24 @@ const ScreenBuffer = struct {
         self.contents[self.place + 7] = 'H';
         self.place += 8;
     }
-    pub fn hLine(self: *Self, x1: usize, y: usize, x2: usize) void {
+    pub fn hLine(self: *Self, x1: usize, y: usize, x2: usize, lineType: *const [3:0]u8) void {
         const start = @min(x1, x2);
         const end = @max(x1, x2);
 
         self.moveTo(start, y);
         for (start..end) |_| {
-            self.write("═");
+            self.write(lineType);
         }
     }
-    pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize) void {
+
+    pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize, lineType: *const [3:0]u8) void {
         const start = @min(y1, y2);
         const end = @max(y1, y2);
 
         self.moveTo(x, start);
         for (start..end) |y| {
             self.moveTo(x, y);
-            self.write("║");
+            self.write(lineType);
         }
     }
 };
@@ -107,17 +98,25 @@ pub fn main() !void {
     const tty = try Terminal.init();
     defer tty.close();
     var buf = ScreenBuffer.init();
-    print("terminal size detected: [{d}, {d}]", .{ tty.rows, tty.cols });
+    //print("terminal size detected: [{d}, {d}]\n", .{ tty.rows, tty.cols });
 
-    buf.write(clear_screen_code);
-    buf.write(blue_code);
-    buf.hLine(2, 1, tty.cols - 2);
-    buf.hLine(2, tty.cols - 2, tty.cols - 2);
-    buf.vLine(1, 2, tty.rows);
-    buf.vLine(tty.cols - 2, 2, tty.rows);
+    buf.write(symbols.clear_screen);
+    buf.write(symbols.blue);
+    buf.hLine(2, 0, tty.cols, symbols.hor_double_line);
+    buf.hLine(2, tty.cols, tty.cols, symbols.hor_double_line);
+    buf.vLine(0, 2, tty.rows, symbols.ver_double_line);
+    buf.vLine(tty.cols, 2, tty.rows, symbols.ver_double_line);
 
-    buf.moveTo(tty.rows / 2, tty.cols / 2);
-    buf.write("imgay");
+    //buf.moveTo(1, 1);
+    //buf.write(symbols.tl_double_line);
+    //buf.moveTo(tty.cols, 1);
+    //buf.write(symbols.tr_double_line);
+    //buf.moveTo(1, tty.rows + 1);
+    //buf.write(symbols.bl_double_line);
+    //buf.moveTo(tty.cols, tty.rows + 1);
+    //buf.write(symbols.br_double_line);
+    //buf.moveTo(tty.cols / 2, tty.rows / 2);
+    //buf.write("imgay");
 
     try tty.writeBuffer(buf);
     while (true) {}
