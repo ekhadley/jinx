@@ -7,8 +7,8 @@ const MAX_BUFFER_SIZE = 8192;
 
 const Terminal = struct {
     tty: File,
-    rows: usize,
-    cols: usize,
+    height: usize,
+    width: usize,
     pix_width: usize,
     pix_height: usize,
     pub fn init() !Terminal {
@@ -19,10 +19,8 @@ const Terminal = struct {
             .tty = tty,
             .pix_width = dims.ws_xpixel,
             .pix_height = dims.ws_ypixel,
-            //.rows = dims.ws_row,
-            //.cols = dims.ws_col,
-            .rows = dims.ws_row,
-            .cols = dims.ws_col,
+            .width = dims.ws_col,
+            .height = dims.ws_row,
         };
     }
     pub fn writeBuffer(self: Terminal, buffer: ScreenBuffer) File.WriteError!void {
@@ -54,8 +52,8 @@ const ScreenBuffer = struct {
         self.place += str.len;
     }
     pub fn moveTo(self: *Self, x: usize, y: usize) void {
-        var X: usize = x;
-        var Y: usize = y;
+        var X: usize = x + 1;
+        var Y: usize = y + 1;
         self.write(symbols.escape);
         self.push('[');
         for (0..3) |i| {
@@ -77,15 +75,39 @@ const ScreenBuffer = struct {
             self.write(lineType);
         }
     }
-
     pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize, lineType: *const [3:0]u8) void {
         const start = @min(y1, y2);
         const end = @max(y1, y2);
-
         self.moveTo(x, start);
         for (start..end) |y| {
             self.moveTo(x, y);
             self.write(lineType);
+        }
+    }
+    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize) void {
+        const startx = @min(x1, x2);
+        const endx = @max(x1, x2);
+        const starty = @min(y1, y2);
+        const endy = @max(y1, y2);
+        self.moveTo(startx, starty);
+        self.write(symbols.tl_double_line); // top left corner
+        for (startx..endx - 1) |_| {
+            self.write(symbols.hor_double_line); // top edge
+        }
+        self.write(symbols.tr_double_line); // top right corner
+        self.moveTo(startx, endy);
+        self.write(symbols.bl_double_line); // bottom left corner
+        for (startx..endx - 1) |_| {
+            self.write(symbols.hor_double_line); // bottom edge
+        }
+        self.write(symbols.br_double_line); // bottom right corner
+        for (0..endy - starty - 1) |i| {
+            self.moveTo(endx, endy - i - 1);
+            self.write(symbols.ver_double_line); // right edge
+        }
+        for (0..endy - starty - 1) |i| {
+            self.moveTo(startx, endy - i - 1); // left edge
+            self.write(symbols.ver_double_line);
         }
     }
 };
@@ -101,22 +123,11 @@ pub fn main() !void {
     //print("terminal size detected: [{d}, {d}]\n", .{ tty.rows, tty.cols });
 
     buf.write(symbols.clear_screen);
-    buf.write(symbols.blue);
-    buf.hLine(2, 0, tty.cols, symbols.hor_double_line);
-    buf.hLine(2, tty.cols, tty.cols, symbols.hor_double_line);
-    buf.vLine(0, 2, tty.rows, symbols.ver_double_line);
-    buf.vLine(tty.cols, 2, tty.rows, symbols.ver_double_line);
-
-    buf.moveTo(1, 1);
-    buf.write(symbols.tl_double_line);
-    buf.moveTo(tty.cols, 1);
-    buf.write(symbols.tr_double_line);
-    buf.moveTo(1, tty.rows + 1);
-    buf.write(symbols.bl_double_line);
-    buf.moveTo(tty.cols, tty.rows + 1);
-    buf.write(symbols.br_double_line);
-    buf.moveTo(tty.cols / 2, tty.rows / 2);
+    buf.rect(0, 0, tty.width - 1, tty.height - 1);
+    buf.write(symbols.red);
+    buf.moveTo(tty.width / 2, tty.height / 2);
     buf.write("imgay");
+    buf.rect(tty.width / 4, tty.height / 4, tty.width * 3 / 4, tty.height * 3 / 4);
 
     try tty.writeBuffer(buf);
     while (true) {}
