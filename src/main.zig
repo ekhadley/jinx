@@ -33,14 +33,20 @@ const Terminal = struct {
 
 const CmdBuffer = struct {
     const Self = @This();
+    const Writer = std.io.Writer(*Self, error{EndOfBuffer}, write);
     place: usize,
     contents: [MAX_BUFFER_SIZE]u8,
-    const Writer = std.io.Writer(*Self, error{EndOfBuffer}, write);
     pub fn init() CmdBuffer {
         return .{ .place = 0, .contents = undefined };
     }
     pub fn writer(self: *Self) Writer {
-        
+        return .{ .context = self };
+    }
+    pub fn writerFn(self: *Self, str: []const u8) error{EndOfBuffer}!void {
+        for (self.contents[self.place..(self.place + str.len)], str) |*c, s| {
+            c.* = s;
+        }
+        self.place += str.len;
     }
     pub fn dump(self: *Self) void {
         self.place = 0;
