@@ -35,18 +35,22 @@ const CmdBuffer = struct {
     const Self = @This();
     place: usize,
     contents: [MAX_BUFFER_SIZE]u8,
+    const Writer = std.io.Writer(*Self, error{EndOfBuffer}, write);
     pub fn init() CmdBuffer {
         return .{ .place = 0, .contents = undefined };
+    }
+    pub fn writer(self: *Self) Writer {
+        
     }
     pub fn dump(self: *Self) void {
         self.place = 0;
         self.clear();
     }
-    pub fn push(self: *Self, char: u8) void {
+    pub fn push(self: *Self, comptime char: u8) void {
         self.contents[self.place] = char;
         self.place += 1;
     }
-    pub fn write(self: *Self, str: []const u8) void {
+    pub fn write(self: *Self, comptime str: []const u8) void {
         for (self.contents[self.place..(self.place + str.len)], str) |*c, s| {
             c.* = s;
         }
@@ -86,7 +90,7 @@ const CmdBuffer = struct {
         self.write(symbols.go_home);
     }
     pub fn writeColor(self: *Self, R: u8, G: u8, B: u8) void {
-        // \esc + [ + 38;RRR;GGG;BBB;249m
+        // \esc + [ + 38;2;RRR;GGG;BBB;249m
         var r = R;
         var g = G;
         var b = B;
@@ -107,7 +111,7 @@ const CmdBuffer = struct {
         //print("buf contents: {s}", .{self.contents[self.place - 22 .. self.place]});
     }
     pub fn writeColorBG(self: *Self, R: u8, G: u8, B: u8) void {
-        // \esc + [ + 38;RRR;GGG;BBB;249m
+        // \esc + [ + 48;2;RRR;GGG;BBB;249m
         var r = R;
         var g = G;
         var b = B;
@@ -198,12 +202,14 @@ pub fn main() !void {
     defer tty.close();
     var buf = CmdBuffer.init();
 
-    const r1 = 10;
+    const r1 = 20;
 
     const cx: f32 = @floatFromInt(tty.width / 2);
     const cy: f32 = @floatFromInt(tty.height / 2);
 
-    var theta: f32 = 0;
+    const g = 0.001;
+    var vtheta: f32 = 0.059;
+    var theta: f32 = 3 * std.math.pi / 4.0;
     var rx: f32 = 0;
     var ry: f32 = -10;
 
@@ -212,20 +218,21 @@ pub fn main() !void {
         buf.writeColor(50, 250, 150);
         buf.push('x');
 
-        buf.writeColor(250, 250, 250);
-        buf.writeColorBG(250, 80, 40);
         buf.moveTo(@intFromFloat(cx), @intFromFloat(cy));
+        buf.writeColor(250, 250, 250);
         buf.push('O');
         buf.endColor();
-
         buf.goHome();
-        try tty.writeBuffer(buf);
 
-        theta += 0.1;
+        try buf.writer.print("hello test {d}", .{123});
+
+        vtheta += g * std.math.sin(theta + std.math.pi / 2.0);
+        theta += vtheta;
+        //theta += 0.1;
         rx = r1 * std.math.cos(theta);
         ry = r1 * std.math.sin(theta);
 
-        std.time.sleep(100000000);
+        std.time.sleep(10000000);
         buf.dump();
     }
 }
