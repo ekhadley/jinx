@@ -23,7 +23,7 @@ const Terminal = struct {
             .height = dims.ws_row,
         };
     }
-    pub fn writeBuffer(self: Terminal, buffer: ScreenBuffer) File.WriteError!void {
+    pub fn writeBuffer(self: Terminal, buffer: CmdBuffer) File.WriteError!void {
         try self.tty.writeAll(buffer.contents[0..buffer.place]);
     }
     pub fn close(self: Terminal) void {
@@ -31,15 +31,16 @@ const Terminal = struct {
     }
 };
 
-const ScreenBuffer = struct {
+const CmdBuffer = struct {
     const Self = @This();
     place: usize,
     contents: [MAX_BUFFER_SIZE]u8,
-    pub fn init() ScreenBuffer {
+    pub fn init() CmdBuffer {
         return .{ .place = 0, .contents = undefined };
     }
     pub fn dump(self: *Self) void {
         self.place = 0;
+        self.clear();
     }
     pub fn push(self: *Self, char: u8) void {
         self.contents[self.place] = char;
@@ -51,16 +52,91 @@ const ScreenBuffer = struct {
         }
         self.place += str.len;
     }
-    pub fn moveTo(self: *Self, x: usize, y: usize) void {
-        var X: usize = x + 1;
-        var Y: usize = y + 1;
-        self.write(symbols.escape);
-        self.push('[');
+    pub fn clear(self: *Self) void {
+        self.write(symbols.clear_screen);
+    }
+    pub fn startRed(self: *Self) void {
+        self.write(symbols.red);
+    }
+    pub fn startBlack(self: *Self) void {
+        self.write(symbols.black);
+    }
+    pub fn startGreen(self: *Self) void {
+        self.write(symbols.green);
+    }
+    pub fn startYellow(self: *Self) void {
+        self.write(symbols.yellow);
+    }
+    pub fn startBlue(self: *Self) void {
+        self.write(symbols.blue);
+    }
+    pub fn startPurple(self: *Self) void {
+        self.write(symbols.purple);
+    }
+    pub fn startCyan(self: *Self) void {
+        self.write(symbols.cyan);
+    }
+    pub fn startWhite(self: *Self) void {
+        self.write(symbols.white);
+    }
+    pub fn endColor(self: *Self) void {
+        self.write(symbols.end_color);
+    }
+    pub fn goHome(self: *Self) void {
+        self.write(symbols.go_home);
+    }
+    pub fn writeColor(self: *Self, R: u8, G: u8, B: u8) void {
+        // \esc + [ + 38;RRR;GGG;BBB;249m
+        var r = R;
+        var g = G;
+        var b = B;
+        self.write(symbols.escape_csi);
+        self.write("38;2;");
         for (0..3) |i| {
-            self.contents[self.place + 2 - i] = @intCast(Y % 10 + '0');
-            self.contents[self.place + 6 - i] = @intCast(X % 10 + '0');
-            X /= 10;
-            Y /= 10;
+            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
+            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
+            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
+            r /= 10;
+            g /= 10;
+            b /= 10;
+        }
+        self.contents[self.place + 3] = ';';
+        self.contents[self.place + 7] = ';';
+        self.place += 11;
+        self.write(";249m");
+        //print("buf contents: {s}", .{self.contents[self.place - 22 .. self.place]});
+    }
+    pub fn writeColorBG(self: *Self, R: u8, G: u8, B: u8) void {
+        // \esc + [ + 38;RRR;GGG;BBB;249m
+        var r = R;
+        var g = G;
+        var b = B;
+        self.write(symbols.escape_csi);
+        self.write("48;2;");
+        for (0..3) |i| {
+            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
+            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
+            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
+            r /= 10;
+            g /= 10;
+            b /= 10;
+        }
+        self.contents[self.place + 3] = ';';
+        self.contents[self.place + 7] = ';';
+        self.place += 11;
+        self.write(";249m");
+        //print("buf contents: {s}", .{self.contents[self.place - 22 .. self.place]});
+    }
+    pub fn moveTo(self: *Self, X: usize, Y: usize) void {
+        // \esc + [ + XXX;YYYH
+        var x: usize = X + 1;
+        var y: usize = Y + 1;
+        self.write(symbols.escape_csi);
+        for (0..3) |i| {
+            self.contents[self.place + 2 - i] = @intCast(y % 10 + '0');
+            self.contents[self.place + 6 - i] = @intCast(x % 10 + '0');
+            x /= 10;
+            y /= 10;
         }
         self.contents[self.place + 3] = ';';
         self.contents[self.place + 7] = 'H';
@@ -116,19 +192,40 @@ pub fn main() !void {
     //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     //defer _ = gpa.deinit();
     //const alloc = gpa.allocator();
+    //fuck the heap all my homies hate the heap
 
     const tty = try Terminal.init();
     defer tty.close();
-    var buf = ScreenBuffer.init();
-    //print("terminal size detected: [{d}, {d}]\n", .{ tty.rows, tty.cols });
+    var buf = CmdBuffer.init();
 
-    buf.write(symbols.clear_screen);
-    buf.rect(0, 0, tty.width - 1, tty.height - 1);
-    buf.write(symbols.red);
-    buf.moveTo(tty.width / 2, tty.height / 2);
-    buf.write("imgay");
-    buf.rect(tty.width / 4, tty.height / 4, tty.width * 3 / 4, tty.height * 3 / 4);
+    const r1 = 10;
 
-    try tty.writeBuffer(buf);
-    while (true) {}
+    const cx: f32 = @floatFromInt(tty.width / 2);
+    const cy: f32 = @floatFromInt(tty.height / 2);
+
+    var theta: f32 = 0;
+    var rx: f32 = 0;
+    var ry: f32 = -10;
+
+    while (true) {
+        buf.moveTo(@intFromFloat(cx + rx), @intFromFloat(cy + ry));
+        buf.writeColor(50, 250, 150);
+        buf.push('x');
+
+        buf.writeColor(250, 250, 250);
+        buf.writeColorBG(250, 80, 40);
+        buf.moveTo(@intFromFloat(cx), @intFromFloat(cy));
+        buf.push('O');
+        buf.endColor();
+
+        buf.goHome();
+        try tty.writeBuffer(buf);
+
+        theta += 0.1;
+        rx = r1 * std.math.cos(theta);
+        ry = r1 * std.math.sin(theta);
+
+        std.time.sleep(100000000);
+        buf.dump();
+    }
 }
