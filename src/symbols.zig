@@ -3,14 +3,14 @@ pub const escape = "\x1b";
 pub const escape_csi = "\x1b["; // esc + [ is the 'control sequence introducer'
 
 // colors
-pub const black = escape ++ "[0;30m";
-pub const red = escape ++ "[0;31m";
-pub const green = escape ++ "[0;32m";
-pub const yellow = escape ++ "[0;33m";
-pub const blue = escape ++ "[0;34m";
-pub const purple = escape ++ "[0;35m";
-pub const cyan = escape ++ "[0;36m";
-pub const white = escape ++ "[0;37m";
+pub const black = escape_csi ++ "0;30m";
+pub const red = escape_csi ++ "0;31m";
+pub const green = escape_csi ++ "0;32m";
+pub const yellow = escape_csi ++ "0;33m";
+pub const blue = escape_csi ++ "0;34m";
+pub const purple = escape_csi ++ "0;35m";
+pub const cyan = escape_csi ++ "0;36m";
+pub const white = escape_csi ++ "0;37m";
 // end color
 pub const end_color = escape ++ "[0m";
 

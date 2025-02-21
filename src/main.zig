@@ -13,12 +13,13 @@ pub fn main() !void {
     const cy: f32 = @floatFromInt(tty.height / 2);
 
     const g = 0.001;
-    var vtheta: f32 = 0.059;
+    var vtheta: f32 = 0.058;
     var theta: f32 = 3 * std.math.pi / 4.0;
     var rx: f32 = 0;
     var ry: f32 = -10;
 
     while (true) {
+        buf.startColor(250, 50, 250);
         buf.rect(tty.width / 4, tty.height / 4, 3 * tty.width / 4, 3 * tty.height / 4, symbols.thick_line);
 
         buf.moveTo(@intFromFloat(cx + rx), @intFromFloat(cy + ry));
@@ -26,8 +27,8 @@ pub fn main() !void {
         buf.push('x');
 
         buf.moveTo(@intFromFloat(cx), @intFromFloat(cy));
-        buf.startColor(250, 250, 250);
-        buf.push('O');
+        buf.startColor(20, 150, 250);
+        try buf.printf("{d:.3}", .{ry});
         buf.endColor();
         buf.goHome();
 

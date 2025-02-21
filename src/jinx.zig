@@ -91,47 +91,33 @@ pub const CmdBuffer = struct {
     pub fn goHome(self: *Self) void {
         self.write(symbols.go_home);
     }
-    pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
-        // \esc + [ + 38;2;RRR;GGG;BBB;249m
+    pub fn writeRGB(self: *Self, R: u8, G: u8, B: u8) void {
         var r = R;
         var g = G;
         var b = B;
+        for (0..3) |i| {
+            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
+            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
+            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
+            r /= 10;
+            g /= 10;
+            b /= 10;
+        }
+        self.contents[self.place + 3] = ';';
+        self.contents[self.place + 7] = ';';
+        self.place += 11;
+    }
+    pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
         self.write(symbols.escape_csi);
         self.write("38;2;");
-        for (0..3) |i| {
-            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
-            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
-            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
-            r /= 10;
-            g /= 10;
-            b /= 10;
-        }
-        self.contents[self.place + 3] = ';';
-        self.contents[self.place + 7] = ';';
-        self.place += 11;
+        self.writeRGB(R, G, B);
         self.write(";249m");
-        //print("buf contents: {s}", .{self.contents[self.place - 22 .. self.place]});
     }
-    pub fn writeColorBG(self: *Self, R: u8, G: u8, B: u8) void {
-        // \esc + [ + 48;2;RRR;GGG;BBB;249m
-        var r = R;
-        var g = G;
-        var b = B;
+    pub fn startColorBG(self: *Self, R: u8, G: u8, B: u8) void {
         self.write(symbols.escape_csi);
         self.write("48;2;");
-        for (0..3) |i| {
-            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
-            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
-            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
-            r /= 10;
-            g /= 10;
-            b /= 10;
-        }
-        self.contents[self.place + 3] = ';';
-        self.contents[self.place + 7] = ';';
-        self.place += 11;
+        self.writeRGB(R, G, B);
         self.write(";249m");
-        //print("buf contents: {s}", .{self.contents[self.place - 22 .. self.place]});
     }
     pub fn moveTo(self: *Self, X: usize, Y: usize) void {
         // \esc + [ + XXX;YYYH
@@ -173,23 +159,23 @@ pub const CmdBuffer = struct {
         const endy = @max(y1, y2);
 
         self.moveTo(startx, starty);
-        self.write(line_type.corner_tl); // top left corner
+        self.write(line_type.corner_tl);
         for (startx..endx - 1) |_| {
-            self.write(line_type.hor); // top edge
+            self.write(line_type.hor);
         }
-        self.write(line_type.corner_tr); // top right corner
+        self.write(line_type.corner_tr);
         self.moveTo(startx, endy);
-        self.write(line_type.corner_bl); // bottom left corner
+        self.write(line_type.corner_bl);
         for (startx..endx - 1) |_| {
-            self.write(line_type.hor); // bottom edge
+            self.write(line_type.hor);
         }
-        self.write(line_type.corner_br); // bottom right corner
+        self.write(line_type.corner_br);
         for (0..endy - starty - 1) |i| {
             self.moveTo(endx, endy - i - 1);
-            self.write(line_type.ver); // right edge
+            self.write(line_type.ver);
         }
         for (0..endy - starty - 1) |i| {
-            self.moveTo(startx, endy - i - 1); // left edge
+            self.moveTo(startx, endy - i - 1);
             self.write(line_type.ver);
         }
     }
