@@ -25,26 +25,75 @@ pub const go_home = escape ++ "[H";
 pub const clear_screen = escape ++ "[2J";
 
 // box drawing unicode characters:
-pub const hor_single_line = "─";
-pub const ver_single_line = "│";
-pub const tl_single_line = "┌";
-pub const bl_single_line = "└";
-pub const tr_single_line = "┐";
-pub const br_single_line = "└";
-
-pub const hor_double_line = "═";
-pub const ver_double_line = "║";
-pub const tl_double_line = "╔";
-pub const bl_double_line = "╚";
-pub const tr_double_line = "╗";
-pub const br_double_line = "╝";
-
-pub const LineTypes = enum {
-    double,
-    single,
-    thick,
-    dotted,
-    dotted_thick,
-    dashed,
-    dashed_thick,
+pub const LineType = struct {
+    hor: []const u8,
+    ver: []const u8,
+    corner_tl: []const u8,
+    corner_tr: []const u8,
+    corner_bl: []const u8,
+    corner_br: []const u8,
+};
+pub const tl_line = "┌";
+pub const bl_line = "└";
+pub const tr_line = "┐";
+pub const br_line = "┘";
+pub const normal_line = LineType{
+    .hor = "─",
+    .ver = "│",
+    .corner_tr = tr_line,
+    .corner_tl = tl_line,
+    .corner_bl = bl_line,
+    .corner_br = br_line,
+};
+pub const double_line = LineType{
+    .hor = "═",
+    .ver = "║",
+    .corner_tr = "╗",
+    .corner_tl = "╔",
+    .corner_bl = "╚",
+    .corner_br = "╝",
+};
+pub const tl_thick_line = "┏";
+pub const bl_thick_line = "┗";
+pub const tr_thick_line = "┓";
+pub const br_thick_line = "┛";
+pub const thick_line = LineType{
+    .hor = "━",
+    .ver = "┃",
+    .corner_tr = tr_thick_line,
+    .corner_tl = tl_thick_line,
+    .corner_bl = bl_thick_line,
+    .corner_br = br_thick_line,
+};
+pub const dotted_line = LineType{
+    .hor = "┄",
+    .ver = "┊",
+    .corner_tr = tr_line,
+    .corner_tl = tl_line,
+    .corner_bl = bl_line,
+    .corner_br = br_line,
+};
+pub const dotted_thick_line = LineType{
+    .hor = "┅",
+    .ver = "┇",
+    .corner_tr = tr_thick_line,
+    .corner_tl = tl_thick_line,
+    .corner_bl = bl_thick_line,
+    .corner_br = br_thick_line,
+};
+pub const dashed_line = LineType{
+    .hor = "╌",
+    .ver = "╎",
+    .corner_tr = tr_line,
+    .corner_tl = tl_line,
+    .corner_bl = bl_line,
+    .corner_br = br_line,
+};
+pub const dashed_thick_line = LineType{
+    .hor = "╍",
+    .ver = "╏",
+    .corner_tr = tr_thick_line,
+    .corner_tl = tl_thick_line,
+    .corner_bl = bl_thick_line,
+    .corner_br = br_thick_line,
 };

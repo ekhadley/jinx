@@ -1,6 +1,6 @@
 const std = @import("std");
 const File = std.fs.File;
-const symbols = @import("symbols.zig");
+pub const symbols = @import("symbols.zig");
 
 pub const Terminal = struct {
     tty: File,
@@ -166,33 +166,31 @@ pub const CmdBuffer = struct {
             self.write(lineType);
         }
     }
-    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, lineType: symbols.LineType) void {
+    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: symbols.LineType) void {
         const startx = @min(x1, x2);
         const endx = @max(x1, x2);
         const starty = @min(y1, y2);
         const endy = @max(y1, y2);
 
-        switch lineType
-
         self.moveTo(startx, starty);
-        self.write(symbols.tl_double_line); // top left corner
+        self.write(line_type.corner_tl); // top left corner
         for (startx..endx - 1) |_| {
-            self.write(symbols.hor_double_line); // top edge
+            self.write(line_type.hor); // top edge
         }
-        self.write(symbols.tr_double_line); // top right corner
+        self.write(line_type.corner_tr); // top right corner
         self.moveTo(startx, endy);
-        self.write(symbols.bl_double_line); // bottom left corner
+        self.write(line_type.corner_bl); // bottom left corner
         for (startx..endx - 1) |_| {
-            self.write(symbols.hor_double_line); // bottom edge
+            self.write(line_type.hor); // bottom edge
         }
-        self.write(symbols.br_double_line); // bottom right corner
+        self.write(line_type.corner_br); // bottom right corner
         for (0..endy - starty - 1) |i| {
             self.moveTo(endx, endy - i - 1);
-            self.write(symbols.ver_double_line); // right edge
+            self.write(line_type.ver); // right edge
         }
         for (0..endy - starty - 1) |i| {
             self.moveTo(startx, endy - i - 1); // left edge
-            self.write(symbols.ver_double_line);
+            self.write(line_type.ver);
         }
     }
 };

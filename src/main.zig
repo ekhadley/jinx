@@ -1,5 +1,6 @@
 const std = @import("std");
 const jinx = @import("jinx.zig");
+const symbols = jinx.symbols;
 
 pub fn main() !void {
     const tty = try jinx.Terminal.init();
@@ -18,6 +19,8 @@ pub fn main() !void {
     var ry: f32 = -10;
 
     while (true) {
+        buf.rect(tty.width / 4, tty.height / 4, 3 * tty.width / 4, 3 * tty.height / 4, symbols.thick_line);
+
         buf.moveTo(@intFromFloat(cx + rx), @intFromFloat(cy + ry));
         buf.startColor(50, 250, 150);
         buf.push('x');
