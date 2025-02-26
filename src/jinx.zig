@@ -1,6 +1,7 @@
 const std = @import("std");
 const File = std.fs.File;
 pub const symbols = @import("symbols.zig");
+const Symbol = symbols.Symbol;
 
 pub const Terminal = struct {
     tty: File,
@@ -134,22 +135,22 @@ pub const CmdBuffer = struct {
         self.contents[self.place + 7] = 'H';
         self.place += 8;
     }
-    pub fn hLine(self: *Self, x1: usize, y: usize, x2: usize, lineType: *const [3:0]u8) void {
+    pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: symbols.line_type) void {
         const start = @min(x1, x2);
         const end = @max(x1, x2);
 
         self.moveTo(start, y);
         for (start..end) |_| {
-            self.write(lineType);
+            self.write(line_type.hor);
         }
     }
-    pub fn vLine(self: *Self, x: usize, y1: usize, y2: usize, lineType: *const [3:0]u8) void {
+    pub fn verLine(self: *Self, x: usize, y1: usize, y2: usize, line_type: symbols.line_type) void {
         const start = @min(y1, y2);
         const end = @max(y1, y2);
         self.moveTo(x, start);
         for (start..end) |y| {
             self.moveTo(x, y);
-            self.write(lineType);
+            self.write(line_type);
         }
     }
     pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: symbols.LineType) void {
@@ -178,5 +179,16 @@ pub const CmdBuffer = struct {
             self.moveTo(startx, endy - i - 1);
             self.write(line_type.ver);
         }
+    }
+    pub fn fillRect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, char: u8) void {
+        const startx = @min(x1, x2);
+        const starty = @min(y1, y2);
+        for (0..@abs(x2 - x1)) |_| {
+            for (0..@abs(y2 - y1)) |_| {
+                self.push(char);
+            }
+        }
+
+        self.moveTo(startx, starty);
     }
 };

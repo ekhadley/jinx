@@ -2,6 +2,11 @@
 pub const escape = "\x1b";
 pub const escape_csi = "\x1b["; // esc + [ is the 'control sequence introducer'
 
+pub const Symbol = union {
+    char: u8,
+    unicode: []const u8,
+};
+
 // colors
 pub const black = escape_csi ++ "0;30m";
 pub const red = escape_csi ++ "0;31m";
@@ -97,3 +102,5 @@ pub const dashed_thick_line = LineType{
     .corner_bl = bl_thick_line,
     .corner_br = br_thick_line,
 };
+
+pub const full_block = "█";

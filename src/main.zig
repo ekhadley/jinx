@@ -24,7 +24,7 @@ pub fn main() !void {
 
         buf.moveTo(@intFromFloat(cx + rx), @intFromFloat(cy + ry));
         buf.startColor(50, 250, 150);
-        buf.push('x');
+        buf.write('x');
 
         buf.moveTo(@intFromFloat(cx), @intFromFloat(cy));
         buf.startColor(20, 150, 250);
