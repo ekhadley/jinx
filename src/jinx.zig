@@ -11,14 +11,14 @@ pub const Terminal = struct {
     pix_height: usize,
     pub fn init() !Terminal {
         const tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .write_only, .allow_ctty = true });
-        var dims: std.posix.system.winsize = undefined;
+        var dims: std.posix.winsize = undefined;
         _ = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
         return .{
             .tty = tty,
-            .pix_width = dims.ws_xpixel,
-            .pix_height = dims.ws_ypixel,
-            .width = dims.ws_col,
-            .height = dims.ws_row,
+            .pix_width = dims.xpixel,
+            .pix_height = dims.ypixel,
+            .width = dims.col,
+            .height = dims.row,
         };
     }
     pub fn writeBuffer(self: Terminal, buffer: CmdBuffer) File.WriteError!void {
