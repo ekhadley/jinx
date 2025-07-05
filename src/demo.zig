@@ -39,7 +39,7 @@ pub fn main() !void { // pendulum with a box and a live reading of the pendulum'
         rx = r1 * std.math.cos(theta);
         ry = r1 * std.math.sin(theta);
 
-        std.time.sleep(10000000); // sleep for 100ms
+        std.time.sleep(10_000_000); // sleep for 100ms
         buf.dump(); // 'empty' the  buffer (just moves the pointer to the start of the array)
     }
 }
