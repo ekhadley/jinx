@@ -1,28 +1,14 @@
 const std = @import("std");
 pub fn build(b: *std.Build) void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
 
     const lib = b.addStaticLibrary(.{
         .name = "jinx",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/jinx.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
     b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
@@ -34,6 +20,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
     const demo_cmd = b.addRunArtifact(exe);
     demo_cmd.step.dependOn(b.getInstallStep());
+<<<<<<< Updated upstream
 
     const snake_exe = b.addExecutable(.{
         .name = "jinx",
@@ -50,4 +37,20 @@ pub fn build(b: *std.Build) void {
 
     const run_snake_step = b.step("snake", "Run the snake game demo");
     run_snake_step.dependOn(&demo_cmd.step);
+=======
+    const run_step = b.step("demo", "Run the demo");
+    run_step.dependOn(&demo_cmd.step);
+
+    const exe2 = b.addExecutable(.{
+        .name = "input_demo",
+        .root_source_file = b.path("src/input_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(exe2);
+    const input_demo_cmd = b.addRunArtifact(exe2);
+    input_demo_cmd.step.dependOn(b.getInstallStep());
+    const input_demo_run_step = b.step("input_demo", "Run the terminal input demo");
+    input_demo_run_step.dependOn(&input_demo_cmd.step);
+>>>>>>> Stashed changes
 }
