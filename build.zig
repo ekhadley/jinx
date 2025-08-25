@@ -1,15 +1,7 @@
 const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
-
-    const lib = b.addStaticLibrary(.{
-        .name = "jinx",
-        .root_source_file = b.path("src/jinx.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(lib);
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
     const demo_exe = b.addExecutable(.{
         .name = "demo",
@@ -20,6 +12,8 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(demo_exe);
     const demo_cmd = b.addRunArtifact(demo_exe);
     demo_cmd.step.dependOn(b.getInstallStep());
+    const demo_run_step = b.step("demo", "Run the animation demo");
+    demo_run_step.dependOn(&demo_cmd.step);
 
     const input_demo_exe = b.addExecutable(.{
         .name = "input_demo",
