@@ -3,27 +3,37 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
-    const demo_exe = b.addExecutable(.{
-        .name = "demo",
-        .root_source_file = b.path("src/demo.zig"),
+    const jinx_lib_mod = b.createModule(.{
+        .root_source_file = b.path("src/jinx.zig"),
         .target = target,
         .optimize = optimize,
     });
-    b.installArtifact(demo_exe);
-    const demo_cmd = b.addRunArtifact(demo_exe);
-    demo_cmd.step.dependOn(b.getInstallStep());
-    const demo_run_step = b.step("demo", "Run the animation demo");
-    demo_run_step.dependOn(&demo_cmd.step);
+    const jinx_lib = b.addLibrary(.{
+        .linkage = .dynamic,
+        .name = "jinx",
+        .root_module = jinx_lib_mod,
+    });
+    b.installArtifact(jinx_lib);
+
+    const animation_demo_exe = b.addExecutable(.{
+        .name = "animation_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/demos/animation.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    animation_demo_exe.root_module.addImport("jinx", jinx_lib_mod);
+    b.installArtifact(animation_demo_exe);
 
     const input_demo_exe = b.addExecutable(.{
         .name = "input_demo",
-        .root_source_file = b.path("src/input_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/demos/input.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
+    input_demo_exe.root_module.addImport("jinx", jinx_lib_mod);
     b.installArtifact(input_demo_exe);
-    const input_demo_cmd = b.addRunArtifact(input_demo_exe);
-    input_demo_cmd.step.dependOn(b.getInstallStep());
-    const input_demo_run_step = b.step("input_demo", "Run the terminal input demo");
-    input_demo_run_step.dependOn(&input_demo_cmd.step);
 }
