@@ -1,7 +1,5 @@
 const std = @import("std");
 const File = std.fs.File;
-pub const symbols = @import("symbols.zig");
-const Symbol = symbols.Symbol;
 
 pub const Terminal = struct {
     tty: File,
@@ -10,7 +8,10 @@ pub const Terminal = struct {
     pix_width: usize,
     pix_height: usize,
     pub fn init() !Terminal {
-        const tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .write_only, .allow_ctty = true });
+        const tty = try std.fs.openFileAbsolute("/dev/tty", .{
+            .mode = .write_only,
+            .allow_ctty = true,
+        });
         var dims: std.posix.winsize = undefined;
         _ = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
         return .{
@@ -60,37 +61,10 @@ pub const CmdBuffer = struct {
     }
 
     pub fn clearScreen(self: *Self) void {
-        self.write(symbols.clear_screen);
-    }
-    pub fn startRed(self: *Self) void {
-        self.write(symbols.red);
-    }
-    pub fn startBlack(self: *Self) void {
-        self.write(symbols.black);
-    }
-    pub fn startGreen(self: *Self) void {
-        self.write(symbols.green);
-    }
-    pub fn startYellow(self: *Self) void {
-        self.write(symbols.yellow);
-    }
-    pub fn startBlue(self: *Self) void {
-        self.write(symbols.blue);
-    }
-    pub fn startPurple(self: *Self) void {
-        self.write(symbols.purple);
-    }
-    pub fn startCyan(self: *Self) void {
-        self.write(symbols.cyan);
-    }
-    pub fn startWhite(self: *Self) void {
-        self.write(symbols.white);
-    }
-    pub fn endColor(self: *Self) void {
-        self.write(symbols.end_color);
+        self.write(CLS);
     }
     pub fn goHome(self: *Self) void {
-        self.write(symbols.go_home);
+        self.write(HOME);
     }
     pub fn writeRGB(self: *Self, R: u8, G: u8, B: u8) void {
         var r = R;
@@ -109,13 +83,13 @@ pub const CmdBuffer = struct {
         self.place += 11;
     }
     pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
-        self.write(symbols.escape_csi);
+        self.write(ESC);
         self.write("38;2;");
         self.writeRGB(R, G, B);
         self.write(";249m");
     }
     pub fn startColorBG(self: *Self, R: u8, G: u8, B: u8) void {
-        self.write(symbols.escape_csi);
+        self.write(ESC);
         self.write("48;2;");
         self.writeRGB(R, G, B);
         self.write(";249m");
@@ -124,7 +98,7 @@ pub const CmdBuffer = struct {
         // \esc + [ + XXX;YYYH
         var x: usize = X + 1;
         var y: usize = Y + 1;
-        self.write(symbols.escape_csi);
+        self.write(ESC);
         for (0..3) |i| {
             self.contents[self.place + 2 - i] = @intCast(y % 10 + '0');
             self.contents[self.place + 6 - i] = @intCast(x % 10 + '0');
@@ -135,7 +109,7 @@ pub const CmdBuffer = struct {
         self.contents[self.place + 7] = 'H';
         self.place += 8;
     }
-    pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: symbols.line_type) void {
+    pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: LineType) void {
         const start = @min(x1, x2);
         const end = @max(x1, x2);
 
@@ -144,7 +118,7 @@ pub const CmdBuffer = struct {
             self.write(line_type.hor);
         }
     }
-    pub fn verLine(self: *Self, x: usize, y1: usize, y2: usize, line_type: symbols.line_type) void {
+    pub fn verLine(self: *Self, x: usize, y1: usize, y2: usize, line_type: LineType) void {
         const start = @min(y1, y2);
         const end = @max(y1, y2);
         self.moveTo(x, start);
@@ -153,24 +127,24 @@ pub const CmdBuffer = struct {
             self.write(line_type);
         }
     }
-    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: symbols.LineType) void {
+    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: LineType) void {
         const startx = @min(x1, x2);
         const endx = @max(x1, x2);
         const starty = @min(y1, y2);
         const endy = @max(y1, y2);
 
         self.moveTo(startx, starty);
-        self.write(line_type.corner_tl);
+        self.write(line_type.tl);
         for (startx..endx - 1) |_| {
             self.write(line_type.hor);
         }
-        self.write(line_type.corner_tr);
+        self.write(line_type.tr);
         self.moveTo(startx, endy);
-        self.write(line_type.corner_bl);
+        self.write(line_type.bl);
         for (startx..endx - 1) |_| {
             self.write(line_type.hor);
         }
-        self.write(line_type.corner_br);
+        self.write(line_type.br);
         for (0..endy - starty - 1) |i| {
             self.moveTo(endx, endy - i - 1);
             self.write(line_type.ver);
@@ -188,7 +162,99 @@ pub const CmdBuffer = struct {
                 self.push(char);
             }
         }
-
         self.moveTo(startx, starty);
     }
 };
+
+pub const ESC = "\x1b["; // control sequence introducer
+pub const CLS = ESC ++ "2J";
+
+// colors
+pub const Colors = .{
+    .black = ESC ++ "0;30m",
+    .red = ESC ++ "0;31m",
+    .green = ESC ++ "0;32m",
+    .yellow = ESC ++ "0;33m",
+    .blue = ESC ++ "0;34m",
+    .purple = ESC ++ "0;35m",
+    .cyan = ESC ++ "0;36m",
+    .white = ESC ++ "0;37m",
+    .end_color = ESC ++ "0m",
+};
+
+// cursor movements
+pub const UP = ESC ++ "A";
+pub const DOWN = ESC ++ "B";
+pub const RIGHT = ESC ++ "C";
+pub const LEFT = ESC ++ "D";
+pub const HOME = ESC ++ "H";
+
+// screen control
+
+// box drawing unicode characters:
+pub const LineType = struct {
+    hor: []const u8,
+    ver: []const u8,
+    tl: []const u8,
+    tr: []const u8,
+    bl: []const u8,
+    br: []const u8,
+};
+pub const Line = LineType{
+    .hor = "─",
+    .ver = "│",
+    .tr = "┌",
+    .tl = "┐",
+    .bl = "└",
+    .br = "┘",
+};
+pub const DoubleLine = LineType{
+    .hor = "═",
+    .ver = "║",
+    .tr = "╗",
+    .tl = "╔",
+    .bl = "╚",
+    .br = "╝",
+};
+pub const ThickLine = LineType{
+    .hor = "━",
+    .ver = "┃",
+    .tr = "┓",
+    .tl = "┏",
+    .bl = "┗",
+    .br = "┛",
+};
+pub const DottedLine = LineType{
+    .hor = "┄",
+    .ver = "┊",
+    .tl = "┌",
+    .tr = "┐",
+    .bl = "└",
+    .br = "┘",
+};
+pub const DottedThickLine = LineType{
+    .hor = "┅",
+    .ver = "┇",
+    .tr = "┓",
+    .tl = "┏",
+    .bl = "┗",
+    .br = "┛",
+};
+pub const DashedLine = LineType{
+    .hor = "╌",
+    .ver = "╎",
+    .tr = "┌",
+    .tl = "┐",
+    .bl = "└",
+    .br = "┘",
+};
+pub const DashedThickLine = LineType{
+    .hor = "╍",
+    .ver = "╏",
+    .tr = "┓",
+    .tl = "┏",
+    .bl = "┗",
+    .br = "┛",
+};
+
+pub const BLOCK = "█";
