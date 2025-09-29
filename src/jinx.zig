@@ -3,13 +3,14 @@ const File = std.fs.File;
 
 pub const Terminal = struct {
     tty: File,
-    height: usize,
-    width: usize,
     pix_width: usize,
     pix_height: usize,
-    pub fn init() !Terminal {
+    width: usize,
+    height: usize,
+
+    pub fn openPrimaryTty() !Terminal {
         const tty = try std.fs.openFileAbsolute("/dev/tty", .{
-            .mode = .write_only,
+            .mode = .read_write,
             .allow_ctty = true,
         });
         var dims: std.posix.winsize = undefined;
@@ -22,149 +23,186 @@ pub const Terminal = struct {
             .height = dims.row,
         };
     }
-    pub fn writeBuffer(self: Terminal, buffer: CmdBuffer) File.WriteError!void {
-        try self.tty.writeAll(buffer.contents[0..buffer.place]);
-    }
-    pub fn close(self: Terminal) void {
-        self.tty.close();
+    pub fn close(self: *Terminal) void {
+        _ = self.tty.close();
     }
 };
 
-pub const CmdBuffer = struct {
-    const Self = @This();
-    place: usize,
-    contents: []u8,
-    pub fn init(comptime buffer_size: usize) CmdBuffer {
-        var contents: [buffer_size]u8 = undefined;
-        return .{ .contents = &contents, .place = 0 };
-    }
+pub fn Window(comptime draw_buffer_size: usize, comptime input_buffer_size: usize) type {
+    return struct {
+        const Self = @This();
 
-    pub fn dump(self: *Self) void {
-        self.place = 0;
-        self.clearScreen();
-    }
-    pub fn push(self: *Self, comptime char: u8) void {
-        self.contents[self.place] = char;
-        self.place += 1;
-    }
-    pub fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-        var fbs = std.io.fixedBufferStream(self.contents);
-        fbs.pos = self.place;
-        try std.fmt.format(fbs.writer().any(), fmt, args);
-        self.place = fbs.pos;
-    }
-    pub fn write(self: *Self, str: []const u8) void {
-        for (self.contents[self.place..(self.place + str.len)], str) |*c, s| {
-            c.* = s;
-        }
-        self.place += str.len;
-    }
+        tty: Terminal,
+        draw_place: usize,
+        draw_buffer: [draw_buffer_size]u8,
+        input_buffer: [input_buffer_size]u8,
+        input_place: usize,
+        tty_write_buffer: [draw_buffer_size]u8,
+        tty_writer: std.fs.File.Writer,
+        tty_read_buffer: [input_buffer_size]u8,
+        tty_reader: std.fs.File.Reader,
 
-    pub fn clearScreen(self: *Self) void {
-        self.write(CLS);
-    }
-    pub fn goHome(self: *Self) void {
-        self.write(HOME);
-    }
-    pub fn writeRGB(self: *Self, R: u8, G: u8, B: u8) void {
-        var r = R;
-        var g = G;
-        var b = B;
-        for (0..3) |i| {
-            self.contents[self.place + 2 - i] = @intCast(r % 10 + '0');
-            self.contents[self.place + 6 - i] = @intCast(g % 10 + '0');
-            self.contents[self.place + 10 - i] = @intCast(b % 10 + '0');
-            r /= 10;
-            g /= 10;
-            b /= 10;
-        }
-        self.contents[self.place + 3] = ';';
-        self.contents[self.place + 7] = ';';
-        self.place += 11;
-    }
-    pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
-        self.write(ESC);
-        self.write("38;2;");
-        self.writeRGB(R, G, B);
-        self.write(";249m");
-    }
-    pub fn startColorBG(self: *Self, R: u8, G: u8, B: u8) void {
-        self.write(ESC);
-        self.write("48;2;");
-        self.writeRGB(R, G, B);
-        self.write(";249m");
-    }
-    pub fn moveTo(self: *Self, X: usize, Y: usize) void {
-        // \esc + [ + XXX;YYYH
-        var x: usize = X + 1;
-        var y: usize = Y + 1;
-        self.write(ESC);
-        for (0..3) |i| {
-            self.contents[self.place + 2 - i] = @intCast(y % 10 + '0');
-            self.contents[self.place + 6 - i] = @intCast(x % 10 + '0');
-            x /= 10;
-            y /= 10;
-        }
-        self.contents[self.place + 3] = ';';
-        self.contents[self.place + 7] = 'H';
-        self.place += 8;
-    }
-    pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: LineType) void {
-        const start = @min(x1, x2);
-        const end = @max(x1, x2);
+        pub fn init() !Self {
+            const draw_buffer: [draw_buffer_size]u8 = undefined;
+            const input_buffer: [input_buffer_size]u8 = undefined;
+            const tty = try Terminal.openPrimaryTty();
 
-        self.moveTo(start, y);
-        for (start..end) |_| {
-            self.write(line_type.hor);
-        }
-    }
-    pub fn verLine(self: *Self, x: usize, y1: usize, y2: usize, line_type: LineType) void {
-        const start = @min(y1, y2);
-        const end = @max(y1, y2);
-        self.moveTo(x, start);
-        for (start..end) |y| {
-            self.moveTo(x, y);
-            self.write(line_type);
-        }
-    }
-    pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: LineType) void {
-        const startx = @min(x1, x2);
-        const endx = @max(x1, x2);
-        const starty = @min(y1, y2);
-        const endy = @max(y1, y2);
+            var tty_write_buffer: [draw_buffer_size]u8 = undefined;
+            const tty_writer = tty.tty.writer(&tty_write_buffer);
 
-        self.moveTo(startx, starty);
-        self.write(line_type.tl);
-        for (startx..endx - 1) |_| {
-            self.write(line_type.hor);
+            var tty_read_buffer: [input_buffer_size]u8 = undefined;
+            const tty_reader = tty.tty.reader(&tty_read_buffer);
+
+            return .{
+                .tty = tty,
+                .draw_buffer = draw_buffer,
+                .draw_place = 0,
+                .input_buffer = input_buffer,
+                .input_place = 0,
+                .tty_write_buffer = tty_write_buffer,
+                .tty_writer = tty_writer,
+                .tty_read_buffer = tty_read_buffer,
+                .tty_reader = tty_reader,
+            };
         }
-        self.write(line_type.tr);
-        self.moveTo(startx, endy);
-        self.write(line_type.bl);
-        for (startx..endx - 1) |_| {
-            self.write(line_type.hor);
+
+        pub fn draw(self: *Self) !void {
+            _ = try self.tty_writer.interface.writeAll(self.draw_buffer[0..self.draw_place]);
+            try self.tty_writer.interface.flush();
+            self.draw_place = 0;
+            self.write(CLS);
         }
-        self.write(line_type.br);
-        for (0..endy - starty - 1) |i| {
-            self.moveTo(endx, endy - i - 1);
-            self.write(line_type.ver);
+
+        pub fn flush(self: *Self) void {
+            self.draw_place = 0;
         }
-        for (0..endy - starty - 1) |i| {
-            self.moveTo(startx, endy - i - 1);
-            self.write(line_type.ver);
+        pub fn push(self: *Self, comptime char: u8) void {
+            self.draw_buffer[self.draw_place] = char;
+            self.draw_place += 1;
         }
-    }
-    pub fn fillRect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, char: u8) void {
-        const startx = @min(x1, x2);
-        const starty = @min(y1, y2);
-        for (0..@abs(x2 - x1)) |_| {
-            for (0..@abs(y2 - y1)) |_| {
-                self.push(char);
+        pub fn write(self: *Self, str: []const u8) void {
+            @memcpy(self.draw_buffer[self.draw_place..(self.draw_place + str.len)], str);
+            self.draw_place += str.len;
+        }
+        pub fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+            var fbs = std.io.Writer.fixed(self.draw_buffer[self.draw_place..]);
+            try fbs.print(fmt, args);
+            self.draw_place += 7; ///////////////////////////////////////
+        }
+        pub fn height(self: *Self) usize {
+            return self.tty.height;
+        }
+        pub fn width(self: *Self) usize {
+            return self.tty.width;
+        }
+
+        pub fn goHome(self: *Self) void {
+            self.write(HOME);
+        }
+        pub fn writeRGB(self: *Self, R: u8, G: u8, B: u8) void {
+            var r = R;
+            var g = G;
+            var b = B;
+            for (0..3) |i| {
+                self.draw_buffer[self.draw_place + 2 - i] = @intCast(r % 10 + '0');
+                self.draw_buffer[self.draw_place + 6 - i] = @intCast(g % 10 + '0');
+                self.draw_buffer[self.draw_place + 10 - i] = @intCast(b % 10 + '0');
+                r /= 10;
+                g /= 10;
+                b /= 10;
+            }
+            self.draw_buffer[self.draw_place + 3] = ';';
+            self.draw_buffer[self.draw_place + 7] = ';';
+            self.draw_place += 11;
+        }
+        pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
+            self.write(ESC);
+            self.write("38;2;");
+            self.writeRGB(R, G, B);
+            self.write(";249m");
+        }
+        pub fn startColorBG(self: *Self, R: u8, G: u8, B: u8) void {
+            self.write(ESC);
+            self.write("48;2;");
+            self.writeRGB(R, G, B);
+            self.write(";249m");
+        }
+        pub fn moveTo(self: *Self, X: usize, Y: usize) void {
+            // \esc + [ + XXX;YYYH
+            var x: usize = X + 1;
+            var y: usize = Y + 1;
+            self.write(ESC);
+            for (0..3) |i| {
+                self.draw_buffer[self.draw_place + 2 - i] = @intCast(y % 10 + '0');
+                self.draw_buffer[self.draw_place + 6 - i] = @intCast(x % 10 + '0');
+                x /= 10;
+                y /= 10;
+            }
+            self.draw_buffer[self.draw_place + 3] = ';';
+            self.draw_buffer[self.draw_place + 7] = 'H';
+            self.draw_place += 8;
+        }
+        pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: LineType) void {
+            const start = @min(x1, x2);
+            const end = @max(x1, x2);
+
+            self.moveTo(start, y);
+            for (start..end) |_| {
+                self.write(line_type.hor);
             }
         }
-        self.moveTo(startx, starty);
-    }
-};
+        pub fn verLine(self: *Self, x: usize, y1: usize, y2: usize, line_type: LineType) void {
+            const start = @min(y1, y2);
+            const end = @max(y1, y2);
+            self.moveTo(x, start);
+            for (start..end) |y| {
+                self.moveTo(x, y);
+                self.write(line_type);
+            }
+        }
+        pub fn rect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, line_type: LineType) void {
+            const startx = @min(x1, x2);
+            const endx = @max(x1, x2);
+            const starty = @min(y1, y2);
+            const endy = @max(y1, y2);
+
+            self.moveTo(startx, starty);
+            self.write(line_type.tl);
+            for (startx..endx - 1) |_| {
+                self.write(line_type.hor);
+            }
+            self.write(line_type.tr);
+            self.moveTo(startx, endy);
+            self.write(line_type.bl);
+            for (startx..endx - 1) |_| {
+                self.write(line_type.hor);
+            }
+            self.write(line_type.br);
+            for (0..endy - starty - 1) |i| {
+                self.moveTo(endx, endy - i - 1);
+                self.write(line_type.ver);
+            }
+            for (0..endy - starty - 1) |i| {
+                self.moveTo(startx, endy - i - 1);
+                self.write(line_type.ver);
+            }
+        }
+        pub fn fillRect(self: *Self, x1: usize, y1: usize, x2: usize, y2: usize, char: u8) void {
+            const startx = @min(x1, x2);
+            const starty = @min(y1, y2);
+            for (0..@abs(x2 - x1)) |_| {
+                for (0..@abs(y2 - y1)) |_| {
+                    self.push(char);
+                }
+            }
+            self.moveTo(startx, starty);
+        }
+
+        pub fn close(self: *Self) void {
+            _ = self.tty.close();
+        }
+    };
+}
 
 pub const ESC = "\x1b["; // control sequence introducer
 pub const CLS = ESC ++ "2J";
