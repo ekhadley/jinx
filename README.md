@@ -4,6 +4,6 @@ Uses a fixed size buffer to accumulate draw commands and then write them to the 
 This is done to avoid needing an allocator anywhere
 
 # TODO:
-- upgrading to 0.15 writers/readers
+- ~~upgrading to 0.15 writers/readers~~ ✓ Input demo updated
 - refactoring the drawing system
     - removing cursor position/other side effects as a thing a library user would have to worry about

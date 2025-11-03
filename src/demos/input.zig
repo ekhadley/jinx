@@ -6,19 +6,37 @@ pub fn main() !void {
     var win = try jinx.Window(8192, 256).init();
     defer win.close();
 
-    // var opts: std.posix.termios = undefined;
-    // _ = std.os.linux.tcsetattr(win.tty.tty.handle, std.posix.TCSA.NOW, &opts);
+    // Get a pointer to the reader interface for use with the new Zig 0.15 API
+    const reader = &win.tty_reader.interface;
 
     var total_bytes_read: usize = 0;
-    while (true) {
-        std.debug.print("reading input...\n", .{});
-        const bytes_read = try win.tty_reader.interface.readSliceShort(&win.read_buffer);
-        // const bytes_read = try t.reader().interface.readSliceShort(&win.read_buffer);
-        total_bytes_read += bytes_read;
+
+    std.debug.print("Type lines of text (Ctrl+D to exit):\n", .{});
+
+    // Use takeDelimiterExclusive to read line-by-line (reads until '\n')
+    while (reader.takeDelimiterExclusive('\n')) |line| {
+        const bytes_read = line.len;
+
         if (bytes_read > 0) {
+            // Copy the line to the window's read buffer
+            @memcpy(win.read_buffer[total_bytes_read..(total_bytes_read + bytes_read)], line);
             total_bytes_read += bytes_read;
-            std.debug.print("read input {d} bytes. current buffer: {s}\n", .{ bytes_read, win.read_buffer[0..total_bytes_read] });
-            //try stdin_writer.flush();
+            std.debug.print("read input {d} bytes. line: {s}\n", .{ bytes_read, line });
+            std.debug.print("total buffer: {s}\n", .{win.read_buffer[0..total_bytes_read]});
         }
+    } else |err| switch (err) {
+        error.EndOfStream => {
+            std.debug.print("End of input reached.\n", .{});
+        },
+        error.StreamTooLong => {
+            std.debug.print("Error: Input line too long for buffer!\n", .{});
+            return err;
+        },
+        error.ReadFailed => {
+            std.debug.print("Error: Read failed!\n", .{});
+            return err;
+        },
     }
+
+    std.debug.print("Final total: {d} bytes read\n", .{total_bytes_read});
 }
