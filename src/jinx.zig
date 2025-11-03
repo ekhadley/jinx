@@ -8,7 +8,7 @@ pub const Terminal = struct {
     width: usize,
     height: usize,
 
-    pub fn openPrimaryTty() !Terminal {
+    pub fn openPrimaryTTY() !Terminal {
         const tty = try std.fs.openFileAbsolute("/dev/tty", .{
             .mode = .read_write,
             .allow_ctty = true,
@@ -28,66 +28,54 @@ pub const Terminal = struct {
     }
 };
 
-pub fn Window(comptime draw_buffer_size: usize, comptime input_buffer_size: usize) type {
+pub fn Window(comptime write_buffer_size: usize, comptime read_buffer_size: usize) type {
     return struct {
         const Self = @This();
 
         tty: Terminal,
-        draw_place: usize,
-        draw_buffer: [draw_buffer_size]u8,
-        input_buffer: [input_buffer_size]u8,
-        input_place: usize,
-        tty_write_buffer: [draw_buffer_size]u8,
-        tty_writer: std.fs.File.Writer,
-        tty_read_buffer: [input_buffer_size]u8,
-        tty_reader: std.fs.File.Reader,
+        tty_writer: std.fs.File.Writer, // writer for writing to the terminal. draw commands, etc
+        tty_reader: std.fs.File.Reader, // reader for reading from the terminal. kb input, etc
+        read_buffer: [read_buffer_size]u8, // buffer for the terminal reader
+        write_buffer: [write_buffer_size]u8, // buffer for the terminal writer
+        read_place: usize, // position in the input buffer
+        write_place: usize,
 
         pub fn init() !Self {
-            const draw_buffer: [draw_buffer_size]u8 = undefined;
-            const input_buffer: [input_buffer_size]u8 = undefined;
-            const tty = try Terminal.openPrimaryTty();
-
-            var tty_write_buffer: [draw_buffer_size]u8 = undefined;
-            const tty_writer = tty.tty.writer(&tty_write_buffer);
-
-            var tty_read_buffer: [input_buffer_size]u8 = undefined;
-            const tty_reader = tty.tty.reader(&tty_read_buffer);
-
+            var write_buffer: [write_buffer_size]u8 = undefined;
+            var read_buffer: [read_buffer_size]u8 = undefined;
+            var tty = try Terminal.openPrimaryTTY();
             return .{
                 .tty = tty,
-                .draw_buffer = draw_buffer,
-                .draw_place = 0,
-                .input_buffer = input_buffer,
-                .input_place = 0,
-                .tty_write_buffer = tty_write_buffer,
-                .tty_writer = tty_writer,
-                .tty_read_buffer = tty_read_buffer,
-                .tty_reader = tty_reader,
+                .tty_writer = tty.tty.writer(&write_buffer),
+                .tty_reader = tty.tty.reader(&read_buffer),
+                .write_buffer = write_buffer,
+                .read_buffer = read_buffer,
+                .write_place = 0,
+                .read_place = 0,
             };
         }
 
         pub fn draw(self: *Self) !void {
-            _ = try self.tty_writer.interface.writeAll(self.draw_buffer[0..self.draw_place]);
+            _ = try self.tty_writer.interface.writeAll(self.write_buffer[0..self.write_place]);
             try self.tty_writer.interface.flush();
-            self.draw_place = 0;
+            self.write_place = 0;
             self.write(CLS);
         }
 
         pub fn flush(self: *Self) void {
-            self.draw_place = 0;
+            self.write_place = 0;
         }
         pub fn push(self: *Self, comptime char: u8) void {
-            self.draw_buffer[self.draw_place] = char;
-            self.draw_place += 1;
+            self.write_buffer[self.write_place] = char;
+            self.write_place += 1;
         }
         pub fn write(self: *Self, str: []const u8) void {
-            @memcpy(self.draw_buffer[self.draw_place..(self.draw_place + str.len)], str);
-            self.draw_place += str.len;
+            @memcpy(self.write_buffer[self.write_place..(self.write_place + str.len)], str);
+            self.write_place += str.len;
         }
-        pub fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            var fbs = std.io.Writer.fixed(self.draw_buffer[self.draw_place..]);
-            try fbs.print(fmt, args);
-            self.draw_place += 7; ///////////////////////////////////////
+        pub fn writeTextFmt(self: *Self, comptime format: []const u8, args: anytype) !void {
+            const formatted = try std.fmt.bufPrint(self.write_buffer[self.write_place..], format, args);
+            self.write_place += formatted.len;
         }
         pub fn height(self: *Self) usize {
             return self.tty.height;
@@ -104,16 +92,16 @@ pub fn Window(comptime draw_buffer_size: usize, comptime input_buffer_size: usiz
             var g = G;
             var b = B;
             for (0..3) |i| {
-                self.draw_buffer[self.draw_place + 2 - i] = @intCast(r % 10 + '0');
-                self.draw_buffer[self.draw_place + 6 - i] = @intCast(g % 10 + '0');
-                self.draw_buffer[self.draw_place + 10 - i] = @intCast(b % 10 + '0');
+                self.write_buffer[self.write_place + 2 - i] = @intCast(r % 10 + '0');
+                self.write_buffer[self.write_place + 6 - i] = @intCast(g % 10 + '0');
+                self.write_buffer[self.write_place + 10 - i] = @intCast(b % 10 + '0');
                 r /= 10;
                 g /= 10;
                 b /= 10;
             }
-            self.draw_buffer[self.draw_place + 3] = ';';
-            self.draw_buffer[self.draw_place + 7] = ';';
-            self.draw_place += 11;
+            self.write_buffer[self.write_place + 3] = ';';
+            self.write_buffer[self.write_place + 7] = ';';
+            self.write_place += 11;
         }
         pub fn startColor(self: *Self, R: u8, G: u8, B: u8) void {
             self.write(ESC);
@@ -133,14 +121,14 @@ pub fn Window(comptime draw_buffer_size: usize, comptime input_buffer_size: usiz
             var y: usize = Y + 1;
             self.write(ESC);
             for (0..3) |i| {
-                self.draw_buffer[self.draw_place + 2 - i] = @intCast(y % 10 + '0');
-                self.draw_buffer[self.draw_place + 6 - i] = @intCast(x % 10 + '0');
+                self.write_buffer[self.write_place + 2 - i] = @intCast(y % 10 + '0');
+                self.write_buffer[self.write_place + 6 - i] = @intCast(x % 10 + '0');
                 x /= 10;
                 y /= 10;
             }
-            self.draw_buffer[self.draw_place + 3] = ';';
-            self.draw_buffer[self.draw_place + 7] = 'H';
-            self.draw_place += 8;
+            self.write_buffer[self.write_place + 3] = ';';
+            self.write_buffer[self.write_place + 7] = 'H';
+            self.write_place += 8;
         }
         pub fn horLine(self: *Self, x1: usize, y: usize, x2: usize, line_type: LineType) void {
             const start = @min(x1, x2);
