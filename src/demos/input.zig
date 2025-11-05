@@ -7,22 +7,20 @@ pub fn main() !void {
     defer win.close();
     const reader = &win.tty_reader.interface;
 
-    const original = try std.posix.tcgetattr(win.tty.f.handle);
-    var raw = original;
-    raw.lflag.ECHO = false;
-    raw.lflag.ICANON = false;
-    raw.lflag.ISIG = false;
-    raw.iflag.IXON = false;
-    raw.iflag.ICRNL = false;
-    raw.iflag.BRKINT = false;
-    raw.iflag.INPCK = false;
-    raw.iflag.ISTRIP = false;
-    raw.oflag.OPOST = false;
-    raw.cflag.CSIZE = std.posix.CSIZE.CS8;
-    try std.posix.tcsetattr(win.tty.f.handle, std.posix.TCSA.NOW, raw);
+    // const original = try std.posix.tcgetattr(win.tty.f.handle);
+    // var raw = original;
+    // raw.lflag.ECHO = false;
+    // raw.lflag.ICANON = false;
+    // raw.lflag.ISIG = true;
+    // raw.iflag.IXON = false;
+    // raw.iflag.ICRNL = false;
+    // raw.iflag.BRKINT = false;
+    // raw.oflag.OPOST = false;
+    // raw.cflag.CSIZE = std.posix.CSIZE.CS8;
+    // try std.posix.tcsetattr(win.tty.f.handle, std.posix.TCSA.NOW, raw);
 
-    // const line = try reader.takeDelimiterExclusive('\n');
-    // std.debug.print("read input {d} bytes. line: '{s}'\n", .{ line.len, line });
+    try win.tty.setECHO(false);
+    try win.tty.setICANON(false);
 
     std.debug.print("waiting for input...\n", .{});
     while (reader.takeByte()) |byte| {

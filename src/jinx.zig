@@ -1,8 +1,10 @@
 const std = @import("std");
 const File = std.fs.File;
 
-pub const Terminal = struct {
+const Terminal = struct {
     f: File,
+    termios: std.posix.termios,
+    original_termios: std.posix.termios,
     pix_width: usize,
     pix_height: usize,
     width: usize,
@@ -15,8 +17,11 @@ pub const Terminal = struct {
         });
         var dims: std.posix.winsize = undefined;
         _ = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
+        const tty_termios = try std.posix.tcgetattr(tty.handle);
         return .{
             .f = tty,
+            .termios = tty_termios,
+            .original_termios = tty_termios,
             .pix_width = dims.xpixel,
             .pix_height = dims.ypixel,
             .width = dims.col,
@@ -25,6 +30,30 @@ pub const Terminal = struct {
     }
     pub fn close(self: *Terminal) void {
         _ = self.f.close();
+    }
+    pub fn setECHO(self: *Terminal, o: bool) !void {
+        self.termios.lflag.ECHO = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
+    }
+    pub fn setISIG(self: *Terminal, o: bool) !void {
+        self.termios.lflag.ISIG = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
+    }
+    pub fn setICANON(self: *Terminal, o: bool) !void {
+        self.termios.lflag.ICANON = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
+    }
+    pub fn setIXON(self: *Terminal, o: bool) !void {
+        self.termios.iflag.IXON = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
+    }
+    pub fn setBRKINT(self: *Terminal, o: bool) !void {
+        self.termios.iflag.BRKINT = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
+    }
+    pub fn setICRNL(self: *Terminal, o: bool) !void {
+        self.termios.iflag.ICRNL = o;
+        try std.posix.tcsetattr(self.f.handle, std.posix.TCSA.NOW, self.termios);
     }
 };
 
