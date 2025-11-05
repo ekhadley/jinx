@@ -2,7 +2,7 @@ const std = @import("std");
 const File = std.fs.File;
 
 pub const Terminal = struct {
-    tty: File,
+    f: File,
     pix_width: usize,
     pix_height: usize,
     width: usize,
@@ -16,7 +16,7 @@ pub const Terminal = struct {
         var dims: std.posix.winsize = undefined;
         _ = std.os.linux.ioctl(tty.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&dims));
         return .{
-            .tty = tty,
+            .f = tty,
             .pix_width = dims.xpixel,
             .pix_height = dims.ypixel,
             .width = dims.col,
@@ -24,7 +24,7 @@ pub const Terminal = struct {
         };
     }
     pub fn close(self: *Terminal) void {
-        _ = self.tty.close();
+        _ = self.f.close();
     }
 };
 
@@ -33,26 +33,27 @@ pub fn Window(comptime write_buffer_size: usize, comptime read_buffer_size: usiz
         const Self = @This();
 
         tty: Terminal,
-        tty_writer: std.fs.File.Writer, // writer for writing to the terminal. draw commands, etc
-        tty_reader: std.fs.File.Reader, // reader for reading from the terminal. kb input, etc
-        read_buffer: [read_buffer_size]u8, // buffer for the terminal reader
-        write_buffer: [write_buffer_size]u8, // buffer for the terminal writer
-        read_place: usize, // position in the input buffer
+        tty_writer: std.fs.File.Writer,
+        tty_reader: std.fs.File.Reader,
+        read_buffer: [read_buffer_size]u8,
+        write_buffer: [write_buffer_size]u8,
+        read_place: usize,
         write_place: usize,
 
         pub fn init() !Self {
-            var write_buffer: [write_buffer_size]u8 = undefined;
-            var read_buffer: [read_buffer_size]u8 = undefined;
             var tty = try Terminal.openPrimaryTTY();
-            return .{
+            var self = Self{
                 .tty = tty,
-                .tty_writer = tty.tty.writer(&write_buffer),
-                .tty_reader = tty.tty.reader(&read_buffer),
-                .write_buffer = write_buffer,
-                .read_buffer = read_buffer,
+                .tty_writer = undefined,
+                .tty_reader = undefined,
+                .write_buffer = undefined,
+                .read_buffer = undefined,
                 .write_place = 0,
                 .read_place = 0,
             };
+            self.tty_writer = tty.f.writer(&self.write_buffer);
+            self.tty_reader = tty.f.reader(&self.read_buffer);
+            return self;
         }
 
         pub fn draw(self: *Self) !void {

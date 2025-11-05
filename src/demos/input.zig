@@ -5,38 +5,34 @@ const symbols = jinx.symbols;
 pub fn main() !void {
     var win = try jinx.Window(8192, 256).init();
     defer win.close();
-
-    // Get a pointer to the reader interface for use with the new Zig 0.15 API
     const reader = &win.tty_reader.interface;
 
-    var total_bytes_read: usize = 0;
+    const original = try std.posix.tcgetattr(win.tty.f.handle);
+    var raw = original;
+    raw.lflag.ECHO = false;
+    raw.lflag.ICANON = false;
+    raw.lflag.ISIG = false;
+    raw.iflag.IXON = false;
+    raw.iflag.ICRNL = false;
+    raw.iflag.BRKINT = false;
+    raw.iflag.INPCK = false;
+    raw.iflag.ISTRIP = false;
+    raw.oflag.OPOST = false;
+    raw.cflag.CSIZE = std.posix.CSIZE.CS8;
+    try std.posix.tcsetattr(win.tty.f.handle, std.posix.TCSA.NOW, raw);
 
-    std.debug.print("Type lines of text (Ctrl+D to exit):\n", .{});
+    // const line = try reader.takeDelimiterExclusive('\n');
+    // std.debug.print("read input {d} bytes. line: '{s}'\n", .{ line.len, line });
 
-    // Use takeDelimiterExclusive to read line-by-line (reads until '\n')
-    while (reader.takeDelimiterExclusive('\n')) |line| {
-        const bytes_read = line.len;
-
-        if (bytes_read > 0) {
-            // Copy the line to the window's read buffer
-            @memcpy(win.read_buffer[total_bytes_read..(total_bytes_read + bytes_read)], line);
-            total_bytes_read += bytes_read;
-            std.debug.print("read input {d} bytes. line: {s}\n", .{ bytes_read, line });
-            std.debug.print("total buffer: {s}\n", .{win.read_buffer[0..total_bytes_read]});
-        }
+    std.debug.print("waiting for input...\n", .{});
+    while (reader.takeByte()) |byte| {
+        std.debug.print("read input byte: {d}\n", .{byte});
     } else |err| switch (err) {
         error.EndOfStream => {
             std.debug.print("End of input reached.\n", .{});
         },
-        error.StreamTooLong => {
-            std.debug.print("Error: Input line too long for buffer!\n", .{});
-            return err;
-        },
         error.ReadFailed => {
             std.debug.print("Error: Read failed!\n", .{});
-            return err;
         },
     }
-
-    std.debug.print("Final total: {d} bytes read\n", .{total_bytes_read});
 }
