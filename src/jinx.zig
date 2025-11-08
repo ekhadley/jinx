@@ -28,6 +28,7 @@ const Terminal = struct {
             .height = dims.row,
         };
     }
+
     pub fn close(self: *Terminal) void {
         _ = self.f.close();
     }

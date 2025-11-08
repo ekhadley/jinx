@@ -19,18 +19,30 @@ pub fn main() !void {
     // raw.cflag.CSIZE = std.posix.CSIZE.CS8;
     // try std.posix.tcsetattr(win.tty.f.handle, std.posix.TCSA.NOW, raw);
 
+    var inp = [_]u8{0} ** 1024;
+    var w = std.io.Writer.fixed(&inp);
+
     try win.tty.setECHO(false);
     try win.tty.setICANON(false);
 
     std.debug.print("waiting for input...\n", .{});
-    while (reader.takeByte()) |byte| {
-        std.debug.print("read input byte: {d}\n", .{byte});
-    } else |err| switch (err) {
-        error.EndOfStream => {
-            std.debug.print("End of input reached.\n", .{});
-        },
-        error.ReadFailed => {
-            std.debug.print("Error: Read failed!\n", .{});
-        },
+    while (true) {
+        std.debug.print("no input read...\n", .{});
+        const num_read = try reader.stream(&w, .limited(1));
+        std.io.poll()
+        std.debug.print("read {d} bytes\n", .{num_read});
+        _ = std.os.linux.nanosleep(&.{ .sec = 0, .nsec = 100_000_000 }, null);
     }
+
+    // std.debug.print("waiting for input...\n", .{});
+    // while (reader.takeByte()) |byte| {
+    //     std.debug.print("read input byte: {d}\n", .{byte});
+    // } else |err| switch (err) {
+    //     error.EndOfStream => {
+    //         std.debug.print("End of input reached.\n", .{});
+    //     },
+    //     error.ReadFailed => {
+    //         std.debug.print("Error: Read failed!\n", .{});
+    //     },
+    // }
 }
